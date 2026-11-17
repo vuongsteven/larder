@@ -43,6 +43,20 @@ const MIGRATIONS: string[] = [
   CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   CREATE TABLE barcode_cache (barcode TEXT PRIMARY KEY, data TEXT NOT NULL, fetched_at INTEGER NOT NULL);
   `,
+  `
+  -- One row per device that turned on expiry reminders. Server-only, never synced.
+  -- last_sent_day (server-local YYYY-MM-DD) makes the daily reminder run once per day.
+  CREATE TABLE push_subscriptions (
+    endpoint TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    last_sent_day TEXT,
+    user_agent TEXT
+  );
+  CREATE INDEX push_subscriptions_user ON push_subscriptions(user_id);
+  `,
 ];
 
 export function openDb(file: string): DB {

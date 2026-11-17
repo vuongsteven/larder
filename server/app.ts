@@ -15,6 +15,8 @@ import {
   changePasswordSchema,
   createUserSchema,
   loginSchema,
+  pushSubscriptionSchema,
+  pushUnsubscribeSchema,
   setupSchema,
   syncRequestSchema,
   type AuthStatus,
@@ -42,6 +44,7 @@ import type { Config } from "./config.ts";
 import { type DB, tx } from "./db.ts";
 import type { ChangeBus } from "./events.ts";
 import { lookupBarcode } from "./lookup.ts";
+import { type PushSender, localDay, sendTestReminder, vapidKeys, webPushSender } from "./push.ts";
 import { currentSeq, exportAll, serverWrite, sync } from "./sync.ts";
 
 type Env = { Variables: { user: PublicUser } };
@@ -51,6 +54,7 @@ export interface AppDeps {
   config: Config;
   bus: ChangeBus;
   fetchImpl?: typeof fetch;
+  pushSender?: PushSender;
 }
 
 export const VERSION = "1.0.0";
@@ -101,7 +105,7 @@ function startSession(c: Context, db: DB, userId: string) {
   });
 }
 
-export function createApp({ db, config, bus, fetchImpl }: AppDeps) {
+export function createApp({ db, config, bus, fetchImpl, pushSender = webPushSender(db, config.pushSubject) }: AppDeps) {
   const app = new Hono<Env>();
   // Per account, and a looser per-address cap so one device can't lock out the household.
   const userLimiter = new LoginLimiter(10);
@@ -289,6 +293,27 @@ export function createApp({ db, config, bus, fetchImpl }: AppDeps) {
     if (!result) throw new HTTPException(502, { message: "Barcode lookup is unavailable right now" });
     return c.json(result);
   });
+
+  api.get("/push/key", auth, (c) => c.json({ publicKey: vapidKeys(db).publicKey, reminderTime: config.reminderTime }));
+
+  api.post("/push/subscriptions", auth, async (c) => {
+    const { endpoint, keys } = await body(c, pushSubscriptionSchema);
+    // An endpoint belongs to one browser profile: whoever signs in there last owns it.
+    db.prepare(
+      `INSERT INTO push_subscriptions (endpoint, user_id, p256dh, auth, created_at, user_agent) VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(endpoint) DO UPDATE SET user_id = excluded.user_id, p256dh = excluded.p256dh,
+         auth = excluded.auth, user_agent = excluded.user_agent`,
+    ).run(endpoint, c.get("user").id, keys.p256dh, keys.auth, Date.now(), c.req.header("user-agent")?.slice(0, 300) ?? null);
+    return c.json({ ok: true }, 201);
+  });
+
+  api.delete("/push/subscriptions", auth, async (c) => {
+    const { endpoint } = await body(c, pushUnsubscribeSchema);
+    db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?").run(endpoint, c.get("user").id);
+    return c.json({ ok: true });
+  });
+
+  api.post("/push/test", auth, async (c) => c.json(await sendTestReminder(db, pushSender, c.get("user").id, localDay(new Date()))));
 
   api.get("/export", auth, (c) => {
     c.header("Content-Disposition", `attachment; filename="larder-export-${new Date().toISOString().slice(0, 10)}.json"`);

@@ -6,13 +6,15 @@ import { backup, newestBackupAge } from "./backup.ts";
 import { loadConfig } from "./config.ts";
 import { openDb } from "./db.ts";
 import { ChangeBus } from "./events.ts";
+import { runDailyReminders, webPushSender } from "./push.ts";
 import { prune } from "./sync.ts";
 
 const config = loadConfig();
 mkdirSync(config.dataDir, { recursive: true });
 const db = openDb(join(config.dataDir, "larder.db"));
 const bus = new ChangeBus();
-const app = createApp({ db, config, bus });
+const pushSender = webPushSender(db, config.pushSubject);
+const app = createApp({ db, config, bus, pushSender });
 
 const backupDir = join(config.dataDir, "backups");
 const intervalMs = config.backupIntervalHours * 3_600_000;
@@ -33,6 +35,23 @@ maintenance();
 const timer = setInterval(maintenance, Math.min(intervalMs, 6 * 3_600_000));
 timer.unref();
 
+let remindersRunning = false;
+async function reminders() {
+  if (remindersRunning) return;
+  remindersRunning = true;
+  try {
+    const { sent, failed } = await runDailyReminders(db, pushSender, new Date(), config.reminderTime);
+    if (sent || failed) console.log(`[larder] expiry reminders: ${sent} sent, ${failed} failed`);
+  } catch (err) {
+    console.error("[larder] expiry reminders failed", err);
+  } finally {
+    remindersRunning = false;
+  }
+}
+void reminders();
+const reminderTimer = setInterval(reminders, 5 * 60_000);
+reminderTimer.unref();
+
 const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host }, (info) => {
   console.log(`[larder] v${VERSION} listening on http://${info.address}:${info.port} (data: ${config.dataDir})`);
 });
@@ -40,6 +59,7 @@ const server = serve({ fetch: app.fetch, port: config.port, hostname: config.hos
 function shutdown(signal: string) {
   console.log(`[larder] ${signal}, shutting down`);
   clearInterval(timer);
+  clearInterval(reminderTimer);
   server.close(() => {
     db.close();
     process.exit(0);

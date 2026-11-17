@@ -17,6 +17,19 @@ export interface Config {
   logRequests: boolean;
   /** Trust X-Forwarded-For from any peer (set when only a reverse proxy can reach the port). */
   trustProxy: boolean;
+  /** Server-local "HH:MM" after which the day's expiry reminders go out. */
+  reminderTime: string;
+  /** VAPID contact for push services, a mailto: or https: URL. */
+  pushSubject: string;
+}
+
+const DEFAULT_REMINDER_TIME = "08:00";
+
+function hhmm(v: string | undefined) {
+  if (!v) return DEFAULT_REMINDER_TIME;
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) return v;
+  console.warn(`[larder] LARDER_REMINDER_TIME "${v}" isn't HH:MM; using ${DEFAULT_REMINDER_TIME}`);
+  return DEFAULT_REMINDER_TIME;
 }
 
 export function loadConfig(env = process.env): Config {
@@ -31,5 +44,7 @@ export function loadConfig(env = process.env): Config {
     backupIntervalHours: Number(env.LARDER_BACKUP_INTERVAL_HOURS ?? 24),
     logRequests: bool(env.LARDER_LOG_REQUESTS, true),
     trustProxy: bool(env.LARDER_TRUST_PROXY, false),
+    reminderTime: hhmm(env.LARDER_REMINDER_TIME),
+    pushSubject: env.LARDER_PUSH_SUBJECT || "mailto:larder@example.com",
   };
 }

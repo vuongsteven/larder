@@ -186,6 +186,27 @@ export interface BarcodeLookup {
   quantityText?: string;
 }
 
+// ---- Web push ------------------------------------------------------------
+
+const base64url = (min: number, max: number) =>
+  z.string().regex(new RegExp(`^[A-Za-z0-9_-]{${min},${max}}={0,2}$`), "Expected a base64url key");
+
+/** A browser's PushSubscription.toJSON(). Push services are always https. */
+export const pushSubscriptionSchema = z.object({
+  endpoint: z.url({ protocol: /^https$/ }).max(2048),
+  keys: z.object({ p256dh: base64url(80, 100), auth: base64url(16, 32) }),
+});
+export type PushSubscriptionInput = z.infer<typeof pushSubscriptionSchema>;
+
+export const pushUnsubscribeSchema = z.object({ endpoint: z.string().min(1).max(2048) });
+
+export interface PushPayload {
+  title: string;
+  body: string;
+  url: string;
+  tag: string;
+}
+
 /** Normalise a product name for matching ("Whole Milk " → "whole milk"). */
 export function nameKey(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");

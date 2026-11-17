@@ -5,8 +5,9 @@ import { createApp } from "../../server/app.ts";
 import { loadConfig } from "../../server/config.ts";
 import { openDb } from "../../server/db.ts";
 import { ChangeBus } from "../../server/events.ts";
+import type { PushSender } from "../../server/push.ts";
 
-export function makeServer(opts: { fetchImpl?: typeof fetch; barcodeLookup?: boolean } = {}) {
+export function makeServer(opts: { fetchImpl?: typeof fetch; barcodeLookup?: boolean; pushSender?: PushSender } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "larder-test-"));
   const db = openDb(join(dir, "larder.db"));
   const bus = new ChangeBus();
@@ -17,7 +18,7 @@ export function makeServer(opts: { fetchImpl?: typeof fetch; barcodeLookup?: boo
     barcodeLookup: opts.barcodeLookup ?? true,
     logRequests: false,
   };
-  const app = createApp({ db, config, bus, fetchImpl: opts.fetchImpl });
+  const app = createApp({ db, config, bus, fetchImpl: opts.fetchImpl, pushSender: opts.pushSender });
   return {
     app,
     db,
@@ -58,7 +59,7 @@ export function client(app: ReturnType<typeof makeServer>["app"]) {
   return {
     get: (p: string) => req("GET", p),
     post: (p: string, b: unknown = {}, h?: Record<string, string>) => req("POST", p, b, h),
-    del: (p: string) => req("DELETE", p),
+    del: (p: string, b?: unknown) => req("DELETE", p, b),
     get cookie() {
       return cookie;
     },

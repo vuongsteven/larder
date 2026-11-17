@@ -12,6 +12,7 @@ A self-hosted app for a household's food: what's in the pantry, fridge and freez
 - **Shopping list.** Quick add understands `2 milk`, `500g flour` and `3x eggs`. Items are grouped by aisle, and anything running low is suggested. Tick things off in the shop, then **Put away**: Larder asks where each one goes, suggesting where you kept it last time, and tops up your stock.
 - **Barcodes.** Scan with the phone camera. A product you've added before is recognised instantly, even offline. A new one is looked up on [Open Food Facts](https://world.openfoodfacts.org) for its name and category; only the barcode number is sent.
 - **Learns your kitchen.** Larder remembers each product's category, unit, usual place and shelf life, so the next time you add it, it's pre-filled.
+- **Expiry reminders.** Turn them on under **More** and each phone gets one notification a morning listing anything that expires within 2 days. Tapping it opens the expiring list.
 - **Tasks.** Kitchen jobs with due dates and optional repeats ("clean out the fridge, every 2 weeks"). Ticking a repeating task rolls it forward.
 - **Household.** Several accounts share one larder. Changes on one phone appear on the others within a second.
 - **Offline first.** Everything works with no connection. Changes queue up and sync when you're back, and the header shows how many are waiting.
@@ -45,6 +46,7 @@ This uses `serve`, not `funnel`, so it is never exposed to the public internet.
 1. Open the `https://…ts.net` address on your phone and create the owner account. The first visitor sets up the household, so do this straight away.
 2. **iPhone:** in Safari tap **Share → Add to Home Screen**. **Android:** in Chrome tap **⋮ → Install app**.
 3. Add the rest of the household under **More → Household → Add**.
+4. For expiry reminders, turn on **More → Expiry reminders** on each phone and allow notifications. On iPhone this needs iOS 16.4 or later, the `https://…ts.net` address, and Larder opened from the Home Screen icon (step 2), not from a Safari tab. **Send a test reminder** checks it works.
 
 ## Configuration
 
@@ -58,7 +60,11 @@ Set these in `compose.yaml` under `environment`:
 | `LARDER_TRUST_PROXY` | `0` (`1` in compose) | Trust `X-Forwarded-For`, so login throttling sees real client addresses behind a proxy. |
 | `LARDER_LOG_REQUESTS` | `1` | Log one line per API request. |
 | `PORT`, `HOST`, `DATA_DIR` | `8787`, `127.0.0.1`, `./data` | Listener and storage location. |
-| `TZ` | `UTC` | Time zone for logs. |
+| `LARDER_REMINDER_TIME` | `08:00` | Local time (`HH:MM`, 24 h) after which each day's expiry reminders go out. |
+| `LARDER_PUSH_SUBJECT` | `mailto:larder@example.com` | Contact URL (`mailto:` or `https:`) sent to push services with each reminder. |
+| `TZ` | `America/Toronto` in compose, else the system's | Time zone for reminders, "today" and logs. |
+
+Reminders need the server to reach the internet: it sends them through Apple's, Google's or Mozilla's push service, whichever the phone uses. Each reminder is end-to-end encrypted to the phone, so the push service can't read which items are listed. The server's push keys are created on first use and kept in the database.
 
 ## Backups and restore
 
@@ -114,10 +120,10 @@ pnpm build && pnpm test:e2e   # Playwright: emulated iPhone (WebKit) and Android
 pnpm icons          # re-render PNG icons from public/favicon.svg
 ```
 
-The end-to-end tests cover adding stock, editing offline and syncing on reconnect, two phones updating each other live, the staple → list → put-away loop, repeating tasks, offline reload from the service worker, and decoding a real EAN-13 through the WebAssembly scanner fed by a fake camera.
+The end-to-end tests cover adding stock, editing offline and syncing on reconnect, two phones updating each other live, the staple → list → put-away loop, repeating tasks, offline reload from the service worker, turning on expiry reminders and receiving one through a fake push service, and decoding a real EAN-13 through the WebAssembly scanner fed by a fake camera.
 
 ```
-server/   HTTP API, auth, sync engine, barcode lookup, backups
+server/   HTTP API, auth, sync engine, barcode lookup, backups, expiry reminders
 shared/   Zod schemas and the sync protocol (used by both sides), category guessing
 web/      React app: lib/ (local DB, sync, actions), components/, routes/
 tests/    server/ and unit/ (Vitest), e2e/ (Playwright)

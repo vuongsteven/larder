@@ -11,7 +11,9 @@ services:
     volumes:
       - ./data:/data
     environment:
-      TZ: ${TZ:-UTC}
+      # Reminders go out at LARDER_REMINDER_TIME in this time zone.
+      TZ: ${TZ:-America/Toronto}
+      LARDER_REMINDER_TIME: "08:00"
       LARDER_BARCODE_LOOKUP: "on"
       LARDER_BACKUP_KEEP: "14"
       LARDER_TRUST_PROXY: "1"

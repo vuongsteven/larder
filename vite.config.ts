@@ -38,6 +38,8 @@ export default defineConfig({
         navigateFallback: "/index.html",
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
+        // Expiry reminder notifications (push and notificationclick handlers).
+        importScripts: ["/push-handler.js"],
       },
     }),
   ],

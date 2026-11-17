@@ -1,26 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { readFileSync } from "node:fs";
-
-// Each run of each project uses its own names, since all tests share one household.
-const tag = () => Math.random().toString(36).slice(2, 7);
-
-async function addItem(page: Page, name: string, opts: { place?: string; expiry?: string; staple?: boolean; qty?: string; navigate?: boolean } = {}) {
-  if (opts.navigate !== false) await page.goto("/stock");
-  await page.getByRole("button", { name: "Add item" }).click();
-  const dialog = page.getByRole("dialog", { name: "Add item" });
-  await dialog.getByRole("textbox", { name: "Name" }).fill(name);
-  if (opts.qty) await dialog.getByRole("textbox", { name: "Quantity" }).fill(opts.qty);
-  if (opts.place) await dialog.getByRole("group", { name: "Kept in" }).getByRole("button", { name: opts.place }).click();
-  if (opts.expiry) await dialog.getByRole("group", { name: "Expires" }).getByRole("button", { name: opts.expiry, exact: true }).click();
-  if (opts.staple) await dialog.getByRole("switch", { name: "Always keep in stock" }).click();
-  await dialog.getByRole("button", { name: "Add to stock" }).click();
-  await expect(dialog).toBeHidden();
-}
-
-async function waitSynced(page: Page) {
-  // The header badge is only shown while changes are waiting.
-  await expect(page.locator("header").getByRole("button", { name: /^\d+$|waiting/ })).toHaveCount(0, { timeout: 10_000 });
-}
+import { addItem, tag, waitSynced } from "./helpers.ts";
 
 test("adds an item and shows it in stock and on the home screen", async ({ page }) => {
   const name = `Cheddar ${tag()}`;

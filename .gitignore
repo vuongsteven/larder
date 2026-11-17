@@ -1,0 +1,9 @@
+node_modules
+dist
+data
+*.db
+tests/e2e/.auth.json
+test-results
+playwright-report
+.env
+data-dev

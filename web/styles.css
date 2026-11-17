@@ -1,0 +1,180 @@
+@import "tailwindcss";
+
+@custom-variant dark {
+  &:where([data-theme="dark"], [data-theme="dark"] *) {
+    @slot;
+  }
+  @media (prefers-color-scheme: dark) {
+    &:where(:root:not([data-theme="light"]) *) {
+      @slot;
+    }
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-caution: var(--caution);
+  --color-caution-soft: var(--caution-soft);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+:root {
+  --bg: #f6f4ef;
+  --surface: #ffffff;
+  --surface-2: #eeebe3;
+  --ink: #1e1c17;
+  --muted: #6b665b;
+  --line: #e2ded3;
+  --accent: #2c6a4c;
+  --accent-ink: #ffffff;
+  --accent-soft: #dfeee5;
+  --danger: #bf3326;
+  --danger-soft: #fbe4e0;
+  --warn: #b85f0b;
+  --warn-soft: #fcead5;
+  --caution: #8a6d00;
+  --caution-soft: #f8f0cc;
+  --toast-action: #a6dcbb;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121311;
+    --surface: #1b1d1a;
+    --surface-2: #262924;
+    --ink: #ecebe5;
+    --muted: #a19e94;
+    --line: #30342d;
+    --accent: #72c194;
+    --accent-ink: #0b1810;
+    --accent-soft: #1d3428;
+    --danger: #ff8073;
+    --danger-soft: #3b1e1a;
+    --warn: #f2a14d;
+    --warn-soft: #3a2913;
+    --caution: #e2c757;
+    --caution-soft: #322c12;
+    --toast-action: #22603f;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #121311;
+  --surface: #1b1d1a;
+  --surface-2: #262924;
+  --ink: #ecebe5;
+  --muted: #a19e94;
+  --line: #30342d;
+  --accent: #72c194;
+  --accent-ink: #0b1810;
+  --accent-soft: #1d3428;
+  --danger: #ff8073;
+  --danger-soft: #3b1e1a;
+  --warn: #f2a14d;
+  --warn-soft: #3a2913;
+  --caution: #e2c757;
+  --caution-soft: #322c12;
+  --toast-action: #22603f;
+  color-scheme: dark;
+}
+
+/* Inside the base layer so Tailwind utilities (text colours on buttons etc.) still win. */
+@layer base {
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-family: var(--font-sans);
+  /* 16px inputs stop iOS Safari zooming on focus. */
+  font-size: 16px;
+}
+
+input,
+select,
+textarea,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  touch-action: manipulation;
+}
+
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-sheet {
+  animation: sheet-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.animate-fade {
+  animation: fade-in 180ms ease-out;
+}
+.animate-toast {
+  animation: toast-in 180ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet,
+  .animate-fade,
+  .animate-toast {
+    animation: none;
+  }
+}

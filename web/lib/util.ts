@@ -85,6 +85,11 @@ export function relativeTime(ms: number): string {
   return `${Math.round(s / 86400)} d ago`;
 }
 
+/** Running from the home screen rather than in a browser tab. */
+export const isStandalone = () =>
+  window.matchMedia("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
+export const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
 export function cx(...parts: (string | false | null | undefined)[]): string {
   return parts.filter(Boolean).join(" ");
 }

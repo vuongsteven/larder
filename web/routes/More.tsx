@@ -1,18 +1,19 @@
-import { ArrowDown, ArrowUp, Database, Download, LogOut, MapPin, Moon, Plus, RefreshCw, Share, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, Bell, Database, Download, LogOut, MapPin, Moon, Plus, RefreshCw, Share, Smartphone, Trash2, UserPlus, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { LOCATION_KINDS, type LocationKind, type PublicUser, type Row } from "../../shared/schema.ts";
 import { PageHeader } from "../components/chrome.tsx";
 import { Sheet } from "../components/Sheet.tsx";
-import { Button, Card, Field, Input, Section, Select } from "../components/ui.tsx";
+import { Button, Card, Field, Input, Section, Select, Toggle } from "../components/ui.tsx";
 import { deleteLocation } from "../lib/actions.ts";
 import { api } from "../lib/api.ts";
 import { useAuth } from "../lib/auth.tsx";
 import { useItems, useLocations, usePendingCount, useSyncStatus } from "../lib/hooks.ts";
+import { disablePush, enablePush, getPushState, sendTestReminder, type PushState } from "../lib/push.ts";
 import { clearLocalData, save } from "../lib/store.ts";
 import { syncEngine } from "../lib/sync.ts";
 import { getTheme, setTheme, type ThemePref } from "../lib/theme.ts";
 import { toast } from "../lib/ui-store.ts";
-import { cx, relativeTime } from "../lib/util.ts";
+import { cx, isIOS, isStandalone, relativeTime } from "../lib/util.ts";
 
 function Row({ icon, label, detail, onClick, danger }: { icon: React.ReactNode; label: string; detail?: React.ReactNode; onClick?: () => void; danger?: boolean }) {
   const Comp = onClick ? "button" : "div";
@@ -28,10 +29,6 @@ function Row({ icon, label, detail, onClick, danger }: { icon: React.ReactNode; 
     </Comp>
   );
 }
-
-const isStandalone = () =>
-  window.matchMedia("(display-mode: standalone)").matches || (navigator as unknown as { standalone?: boolean }).standalone === true;
-const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
 
 export default function More() {
   const { user, signOut } = useAuth();
@@ -183,6 +180,8 @@ export default function More() {
         </Card>
       </Section>
 
+      <RemindersSection />
+
       <Section title="Appearance">
         <Card className="p-1.5">
           <div className="grid grid-cols-3 gap-1" role="radiogroup" aria-label="Theme">
@@ -282,6 +281,88 @@ export default function More() {
         />
       )}
     </>
+  );
+}
+
+function reminderHint(state: PushState, time: string): string {
+  switch (state.kind) {
+    case "on":
+    case "off":
+      return `Daily at ${time} when something expires within 2 days`;
+    case "needs-install":
+      return "On iPhone, add Larder to your Home Screen first, then turn this on here";
+    case "denied":
+      return isIOS()
+        ? "Notifications are off for Larder. Turn them on in Settings → Notifications → Larder."
+        : "Notifications are blocked for this site. Allow them in your browser's site settings.";
+    case "unsupported":
+      return state.reason;
+  }
+}
+
+function RemindersSection() {
+  const [state, setState] = useState<PushState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [time, setTime] = useState("8:00");
+
+  useEffect(() => {
+    const refresh = () => void getPushState().then(setState, () => setState({ kind: "unsupported", reason: "Couldn't check notifications on this device." }));
+    refresh();
+    // Permission may have been changed in Settings while Larder was in the background.
+    const onVisible = () => document.visibilityState === "visible" && refresh();
+    document.addEventListener("visibilitychange", onVisible);
+    api<{ reminderTime: string }>("/api/push/key").then((r) => setTime(r.reminderTime.replace(/^0/, "")), () => {});
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    try {
+      await fn();
+    } catch (e) {
+      toast((e as Error).message || "Something went wrong", { tone: "error" });
+      setState(await getPushState().catch(() => null));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggle = (on: boolean) =>
+    run(async () => {
+      const next = on ? await enablePush() : await disablePush();
+      setState(next);
+      if (on && next.kind === "on") toast("Expiry reminders are on for this device");
+    });
+
+  const test = () =>
+    run(async () => {
+      const { sent } = await sendTestReminder();
+      if (sent > 0) toast("Test reminder sent. It should arrive in a few seconds.");
+      else toast("Couldn't reach this device. Turn reminders off and on again.", { tone: "error" });
+    });
+
+  if (!state) return null;
+  const on = state.kind === "on";
+  return (
+    <Section title="Expiry reminders">
+      <Card>
+        <div className="flex items-center gap-3 px-4 py-3">
+          <Bell className="size-5 shrink-0 text-muted" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Expiry reminders</p>
+            <p className="text-sm text-muted">{reminderHint(state, time)}</p>
+          </div>
+          <Toggle label="Expiry reminders" checked={on} disabled={busy || (state.kind !== "on" && state.kind !== "off")} onChange={toggle} />
+        </div>
+        {on && (
+          <div className="border-t border-line px-4 py-3">
+            <Button size="sm" disabled={busy} onClick={test}>
+              Send a test reminder
+            </Button>
+          </div>
+        )}
+      </Card>
+    </Section>
   );
 }
 

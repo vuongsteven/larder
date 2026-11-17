@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import type { AuthStatus, PublicUser } from "../../shared/schema.ts";
 import { ApiError, api } from "./api.ts";
+import { disablePush } from "./push.ts";
 import { clearLocalData } from "./store.ts";
 import { syncEngine } from "./sync.ts";
 import { toast } from "./ui-store.ts";
@@ -82,6 +83,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     syncEngine.stop();
+    // A shared device shouldn't keep getting this household's reminders.
+    await disablePush().catch(() => {});
     await api("/api/auth/logout", { method: "POST", body: {} }).catch(() => {});
     await clearLocalData();
     rememberUser(null);
